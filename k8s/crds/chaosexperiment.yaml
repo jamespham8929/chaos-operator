@@ -1,0 +1,79 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: chaosexperiments.chaos.jamespham.io
+spec:
+  group: chaos.jamespham.io
+  names:
+    kind: ChaosExperiment
+    listKind: ChaosExperimentList
+    plural: chaosexperiments
+    singular: chaosexperiment
+    shortNames: [ce]
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required: [type, selector]
+              properties:
+                type:
+                  type: string
+                  enum: [pod-failure, network-latency, cpu-stress]
+                selector:
+                  type: object
+                  properties:
+                    matchLabels:
+                      type: object
+                      additionalProperties:
+                        type: string
+                schedule:
+                  type: string
+                  description: Cron schedule for recurring execution (empty = run once)
+                podFailure:
+                  type: object
+                  properties:
+                    percentage:
+                      type: integer
+                      minimum: 1
+                      maximum: 100
+                    gracePeriodSeconds:
+                      type: integer
+                      minimum: 0
+                networkLatency:
+                  type: object
+                  properties:
+                    latencyMs:
+                      type: integer
+                      minimum: 0
+                    jitterMs:
+                      type: integer
+                      minimum: 0
+                    durationSeconds:
+                      type: integer
+                      minimum: 1
+                cpuStress:
+                  type: object
+                  properties:
+                    workers:
+                      type: integer
+                      minimum: 1
+                    durationSeconds:
+                      type: integer
+                      minimum: 1
+      additionalPrinterColumns:
+        - name: Type
+          type: string
+          jsonPath: .spec.type
+        - name: Schedule
+          type: string
+          jsonPath: .spec.schedule
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

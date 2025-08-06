@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chaos-operator
+  namespace: chaos-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: chaos-operator
+rules:
+  - apiGroups: ["chaos.jamespham.io"]
+    resources: ["chaosexperiments"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  - apiGroups: ["chaos.jamespham.io"]
+    resources: ["chaosexperiments/status"]
+    verbs: ["patch", "update"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: chaos-operator
+subjects:
+  - kind: ServiceAccount
+    name: chaos-operator
+    namespace: chaos-system
+roleRef:
+  kind: ClusterRole
+  name: chaos-operator
+  apiGroup: rbac.authorization.k8s.io
