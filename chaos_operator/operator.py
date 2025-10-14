@@ -8,6 +8,7 @@ import kubernetes
 from .experiments.pod_failure import PodFailureExperiment
 from .experiments.network_chaos import NetworkLatencyExperiment
 from .experiments.cpu_stress import CPUStressExperiment
+from .orchestration import has_safe_config, run_safe_experiment
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,12 @@ def _dispatch_experiment(
     if not pods:
         logger.warning("No eligible pods found for experiment in %s", namespace)
         return {"status": "no_targets", "pods_affected": 0}
+
+    # Preferred path: a declared steady-state hypothesis and safety guards turn
+    # this into a verified, abortable run instead of fire-and-forget.
+    if has_safe_config(spec):
+        logger.info("Running %s as a safe experiment (hypothesis + safety guards)", experiment_type)
+        return run_safe_experiment(core_v1, experiment_type, pods, spec)
 
     if experiment_type == "pod-failure":
         cfg = spec.get("podFailure", {})

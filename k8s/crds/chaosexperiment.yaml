@@ -67,6 +67,71 @@ spec:
                     durationSeconds:
                       type: integer
                       minimum: 1
+                prometheus:
+                  type: object
+                  description: Where the operator reads steady-state and guard metrics
+                  properties:
+                    url:
+                      type: string
+                steadyStateHypothesis:
+                  type: object
+                  description: >
+                    The claim that defines a healthy system. Verified before the
+                    experiment (or it refuses to start) and after (or the run is
+                    marked as not recovered).
+                  required: [metric, query]
+                  properties:
+                    metric:
+                      type: string
+                    query:
+                      type: string
+                      description: Instant PromQL returning a single scalar
+                    lower:
+                      type: number
+                      description: Lower bound of the acceptable band (omit for one-sided)
+                    upper:
+                      type: number
+                      description: Upper bound of the acceptable band (omit for one-sided)
+                    sampleSize:
+                      type: integer
+                      minimum: 3
+                      default: 30
+                    confidence:
+                      type: number
+                      default: 0.95
+                safety:
+                  type: object
+                  description: Blast-radius guards that abort the experiment mid-run
+                  required: [guards]
+                  properties:
+                    maxDurationSeconds:
+                      type: integer
+                      minimum: 1
+                      default: 300
+                    pollIntervalSeconds:
+                      type: integer
+                      minimum: 1
+                      default: 5
+                    guards:
+                      type: array
+                      items:
+                        type: object
+                        required: [name, query, threshold]
+                        properties:
+                          name:
+                            type: string
+                          query:
+                            type: string
+                          threshold:
+                            type: number
+                          comparison:
+                            type: string
+                            enum: [gt, lt]
+                            default: gt
+                          consecutiveBreachesToAbort:
+                            type: integer
+                            minimum: 1
+                            default: 3
       additionalPrinterColumns:
         - name: Type
           type: string
