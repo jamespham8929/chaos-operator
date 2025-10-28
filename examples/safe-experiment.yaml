@@ -1,0 +1,54 @@
+apiVersion: chaos.jamespham.io/v1alpha1
+kind: ChaosExperiment
+metadata:
+  name: checkout-latency-safe
+  namespace: payments
+spec:
+  type: network-latency
+  selector:
+    matchLabels:
+      app: checkout-api
+
+  networkLatency:
+    latencyMs: 200
+    jitterMs: 50
+
+  prometheus:
+    url: http://prometheus-operated.monitoring:9090
+
+  # The system is healthy only if the success rate stays at or above 99%.
+  # Verified before injection (refuse to start otherwise) and after (mark the
+  # run as not-recovered otherwise).
+  steadyStateHypothesis:
+    metric: checkout_success_rate
+    query: |
+      sum(rate(http_requests_total{service="checkout-api",code=~"2.."}[1m]))
+      /
+      sum(rate(http_requests_total{service="checkout-api"}[1m]))
+    lower: 0.99
+    upper: 1.0
+    sampleSize: 30
+    confidence: 0.95
+
+  # Abort the experiment if it pushes the blast radius too far. Each guard must
+  # breach for 3 consecutive polls before it trips, so a single noisy scrape will
+  # not abort a healthy run.
+  safety:
+    maxDurationSeconds: 300
+    pollIntervalSeconds: 5
+    guards:
+      - name: error-rate
+        query: |
+          sum(rate(http_requests_total{service="checkout-api",code=~"5.."}[1m]))
+          /
+          sum(rate(http_requests_total{service="checkout-api"}[1m]))
+        threshold: 0.05
+        comparison: gt
+        consecutiveBreachesToAbort: 3
+      - name: latency-p99
+        query: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket{service="checkout-api"}[1m])) by (le))
+        threshold: 1.5
+        comparison: gt
+        consecutiveBreachesToAbort: 3
