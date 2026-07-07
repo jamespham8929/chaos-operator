@@ -1,7 +1,6 @@
 """Tests for the network latency experiment."""
 
 from unittest.mock import MagicMock, patch
-import pytest
 
 from chaos_operator.experiments.network_chaos import NetworkLatencyExperiment
 
@@ -18,7 +17,7 @@ class TestNetworkLatencyExperiment:
         core_v1 = MagicMock()
         exp = NetworkLatencyExperiment(core_v1)
 
-        with patch.object(exp, "_exec") as mock_exec, \
+        with patch.object(exp, "_exec"), \
              patch("time.sleep"):
             pods = [make_pod("pod-0")]
             result = exp.run(pods, {"latencyMs": 100, "jitterMs": 10, "durationSeconds": 1})

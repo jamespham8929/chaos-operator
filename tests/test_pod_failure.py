@@ -1,7 +1,6 @@
 """Tests for the pod failure experiment."""
 
-from unittest.mock import MagicMock, call
-import pytest
+from unittest.mock import MagicMock
 
 from chaos_operator.experiments.pod_failure import PodFailureExperiment
 

@@ -4,7 +4,7 @@ import random
 
 import pytest
 
-from chaos_operator.probes import NoisyProbe, SequenceProbe
+from chaos_operator.probes import NoisyProbe
 from chaos_operator.steady_state import (
     SteadyStateHypothesis,
     SteadyStateVerifier,
@@ -22,7 +22,6 @@ class TestBootstrapCI:
         assert lo <= mean <= hi
 
     def test_tighter_data_gives_narrower_interval(self):
-        rng = random.Random(2)
         tight = [1.0, 1.0, 1.0, 1.0, 1.0]
         loose = [0.5, 1.5, 0.7, 1.3, 1.0]
         lo_t, hi_t = bootstrap_mean_ci(tight, rng=random.Random(3))
