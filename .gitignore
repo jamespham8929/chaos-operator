@@ -5,3 +5,12 @@ __pycache__/
 .venv/
 venv/
 *.env
+
+# Test and build artifacts
+.coverage
+coverage.xml
+htmlcov/
+*.egg-info/
+build/
+dist/
+.DS_Store
