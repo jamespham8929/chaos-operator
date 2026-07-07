@@ -123,13 +123,18 @@ examples/           a runnable local demo and a cluster manifest
 ## Tests
 
 ```bash
-pip install pytest
-PYTHONPATH=. pytest tests/ -v
+pip install -e ".[dev]"
+pytest tests/ -v --cov=chaos_operator
 ```
 
 The runner tests in [`tests/test_runner.py`](tests/test_runner.py) cover the four
 outcomes (succeeded, aborted, refused, did-not-recover) end to end with a fake
 clock, so they run instantly and deterministically.
+
+CI runs the suite on Python 3.10 through 3.12, lints with ruff, and validates the
+CRD schema against the example manifests with
+[`scripts/validate_crd.py`](scripts/validate_crd.py), so the CRD, the examples,
+and the operator's expected spec cannot drift apart.
 
 ## Limitations
 
