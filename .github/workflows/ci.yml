@@ -25,7 +25,7 @@ jobs:
         run: pip install -e ".[dev]"
 
       - name: Run tests
-        run: pytest tests/ -v
+        run: pytest tests/ -v --cov=chaos_operator --cov-report=term-missing
 
   lint:
     name: Lint
