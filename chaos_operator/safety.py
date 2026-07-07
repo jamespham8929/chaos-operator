@@ -39,7 +39,7 @@ class BlastRadiusGuard:
     def reset(self) -> None:
         self._streak = 0
 
-    def observe(self) -> "GuardReading":
+    def observe(self) -> GuardReading:
         value = self.probe.sample()
         breached = self._is_breach(value)
         self._streak = self._streak + 1 if breached else 0

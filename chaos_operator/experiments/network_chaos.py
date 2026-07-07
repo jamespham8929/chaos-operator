@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class NetworkLatencyExperiment:
-    def __init__(self, core_v1: "kubernetes.client.CoreV1Api"):
+    def __init__(self, core_v1: kubernetes.client.CoreV1Api):
         self._core_v1 = core_v1
 
     def run(self, pods: list, config: dict) -> dict:

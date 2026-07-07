@@ -5,9 +5,9 @@ import logging
 import kopf
 import kubernetes
 
-from .experiments.pod_failure import PodFailureExperiment
-from .experiments.network_chaos import NetworkLatencyExperiment
 from .experiments.cpu_stress import CPUStressExperiment
+from .experiments.network_chaos import NetworkLatencyExperiment
+from .experiments.pod_failure import PodFailureExperiment
 from .orchestration import has_safe_config, run_safe_experiment
 
 logger = logging.getLogger(__name__)

@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class CPUStressExperiment:
-    def __init__(self, core_v1: "kubernetes.client.CoreV1Api"):
+    def __init__(self, core_v1: kubernetes.client.CoreV1Api):
         self._core_v1 = core_v1
 
     def run(self, pods: list, config: dict) -> dict:
@@ -36,7 +36,10 @@ class CPUStressExperiment:
                 t.start()
                 threads.append(t)
                 affected.append(f"{namespace}/{name}")
-                logger.info("Started CPU stress on %s/%s (%d workers, %ds)", namespace, name, workers, duration_seconds)
+                logger.info(
+                    "Started CPU stress on %s/%s (%d workers, %ds)",
+                    namespace, name, workers, duration_seconds,
+                )
             except Exception as e:
                 logger.error("Failed to start stress on %s/%s: %s", namespace, name, e)
                 failed.append(f"{namespace}/{name}")
