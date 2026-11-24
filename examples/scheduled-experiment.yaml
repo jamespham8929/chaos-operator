@@ -1,0 +1,49 @@
+# A pod-failure experiment that runs every weekday at 03:00 UTC, when the
+# checkout service is quiet. The operator does not run it at creation. It runs
+# at each fire time, and it skips a run that cannot start within 10 minutes of
+# its slot, so an operator restart at 09:00 does not kill pods at peak time.
+apiVersion: chaos.jamespham.io/v1alpha1
+kind: ChaosExperiment
+metadata:
+  name: checkout-pod-failure-nightly
+  namespace: payments
+spec:
+  type: pod-failure
+  selector:
+    matchLabels:
+      app: checkout-api
+  schedule: "0 3 * * MON-FRI"
+  startingDeadlineSeconds: 600
+  # Set to true to pause the schedule without deleting the experiment.
+  suspend: false
+
+  podFailure:
+    percentage: 30
+    gracePeriodSeconds: 0
+
+  prometheus:
+    url: http://prometheus-operated.monitoring:9090
+
+  steadyStateHypothesis:
+    metric: checkout_success_rate
+    query: |
+      sum(rate(http_requests_total{service="checkout-api",code=~"2.."}[1m]))
+      /
+      sum(rate(http_requests_total{service="checkout-api"}[1m]))
+    lower: 0.99
+    upper: 1.0
+    sampleSize: 30
+    confidence: 0.95
+
+  safety:
+    maxDurationSeconds: 180
+    pollIntervalSeconds: 5
+    guards:
+      - name: error-rate
+        query: |
+          sum(rate(http_requests_total{service="checkout-api",code=~"5.."}[1m]))
+          /
+          sum(rate(http_requests_total{service="checkout-api"}[1m]))
+        threshold: 0.05
+        comparison: gt
+        consecutiveBreachesToAbort: 3

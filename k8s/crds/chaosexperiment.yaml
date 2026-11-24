@@ -35,7 +35,21 @@ spec:
                         type: string
                 schedule:
                   type: string
-                  description: Cron schedule for recurring execution (empty = run once)
+                  description: >-
+                    Five-field cron schedule in UTC, or a macro such as @daily.
+                    Empty means run once, at creation.
+                suspend:
+                  type: boolean
+                  default: false
+                  description: Stop scheduled runs without deleting the experiment.
+                startingDeadlineSeconds:
+                  type: integer
+                  minimum: 30
+                  maximum: 86400
+                  default: 300
+                  description: >-
+                    Skip a scheduled run that cannot start within this many
+                    seconds of its fire time, instead of running it late.
                 podFailure:
                   type: object
                   properties:
@@ -132,6 +146,13 @@ spec:
                             type: integer
                             minimum: 1
                             default: 3
+            status:
+              type: object
+              # The operator writes run results and schedule bookkeeping here.
+              # Without this, the API server prunes every field it writes.
+              x-kubernetes-preserve-unknown-fields: true
+      subresources:
+        status: {}
       additionalPrinterColumns:
         - name: Type
           type: string
@@ -139,6 +160,18 @@ spec:
         - name: Schedule
           type: string
           jsonPath: .spec.schedule
+        - name: Result
+          type: string
+          jsonPath: .status.handle_experiment.status
+        - name: Last Run
+          type: date
+          jsonPath: .status.schedule.lastRunTime
+        - name: Last Result
+          type: string
+          jsonPath: .status.schedule.lastResult
+        - name: Next Run
+          type: string
+          jsonPath: .status.schedule.nextRunTime
         - name: Age
           type: date
           jsonPath: .metadata.creationTimestamp

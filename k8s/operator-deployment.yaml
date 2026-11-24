@@ -34,6 +34,11 @@ spec:
           env:
             - name: CHAOS_PROMETHEUS_URL
               value: http://prometheus-operated.monitoring:9090
+            - name: CHAOS_METRICS_PORT
+              value: "8000"
+          ports:
+            - name: metrics
+              containerPort: 8000
           resources:
             requests:
               cpu: 50m

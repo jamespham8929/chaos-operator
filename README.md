@@ -63,6 +63,29 @@ throughout the run. To avoid aborting on a single noisy scrape, a guard must
 breach for N consecutive polls before it trips (default 3). When any guard trips,
 the fault is rolled back immediately. See [ADR 0002](docs/adr/0002-abort-on-blast-radius.md).
 
+### Scheduled runs happen once, and never late
+
+Set `schedule` to a cron expression and the operator runs the experiment at each
+fire time instead of at creation. If the operator was down across several fire
+times, it runs once for the latest one and counts the rest as missed. A fire
+time older than `startingDeadlineSeconds` is skipped, because chaos planned for
+03:00 should not start at 09:00 peak traffic. `suspend: true` pauses a schedule.
+See [ADR 0003](docs/adr/0003-scheduled-experiments.md).
+
+```console
+$ kubectl get chaosexperiments -n payments
+NAME                           TYPE          SCHEDULE          RESULT      LAST RUN   LAST RESULT   NEXT RUN
+checkout-pod-failure-nightly   pod-failure   0 3 * * MON-FRI   scheduled   9h         succeeded     2026-11-24T03:00:00Z
+```
+
+### Every run is a metric
+
+The operator serves Prometheus metrics on port 8000: runs by type and outcome,
+aborts, run duration, pods touched, steady-state verdicts, and missed schedule
+slots. [`k8s/monitoring.yaml`](k8s/monitoring.yaml) adds the ServiceMonitor and
+two alerts. One fires when a schedule keeps missing runs. The other pages when
+a run leaves the system outside its steady state.
+
 ## Try it without a cluster
 
 The runner, safety controller, and verifier work against any metric probe, so the
@@ -93,7 +116,9 @@ recovery verdict:  violated
 kubectl apply -f k8s/crds/chaosexperiment.yaml
 kubectl apply -f k8s/rbac.yaml
 kubectl apply -f k8s/operator-deployment.yaml
+kubectl apply -f k8s/monitoring.yaml   # needs prometheus-operator
 kubectl apply -f examples/safe-experiment.yaml
+kubectl apply -f examples/scheduled-experiment.yaml
 ```
 
 The example in [`examples/safe-experiment.yaml`](examples/safe-experiment.yaml)
@@ -115,9 +140,12 @@ chaos_operator/
   experiment.py     the inject/rollback protocol
   actions.py        adapters making the real experiments reversible
   orchestration.py  builds a run from a ChaosExperiment spec
+  cron.py           five-field cron parser, UTC
+  scheduling.py     decides per tick whether a scheduled run is due
+  metrics.py        Prometheus counters, histogram, and gauges
   experiments/      the fault injectors (pod failure, network latency, cpu stress)
-docs/adr/           why steady state is statistical, why we abort on blast radius
-examples/           a runnable local demo and a cluster manifest
+docs/adr/           steady state, aborting on blast radius, scheduled runs
+examples/           a runnable local demo and two cluster manifests
 ```
 
 ## Tests
@@ -131,7 +159,10 @@ The runner tests in [`tests/test_runner.py`](tests/test_runner.py) cover the fou
 outcomes (succeeded, aborted, refused, did-not-recover) end to end with a fake
 clock, so they run instantly and deterministically.
 
-CI runs the suite on Python 3.10 through 3.12, lints with ruff, and validates the
+The scheduling tests pass the clock in, so outage and late-start cases run
+without waiting for real time.
+
+CI runs the suite on Python 3.10 through 3.13, lints with ruff, and validates the
 CRD schema against the example manifests with
 [`scripts/validate_crd.py`](scripts/validate_crd.py), so the CRD, the examples,
 and the operator's expected spec cannot drift apart.
@@ -142,8 +173,8 @@ and the operator's expected spec cannot drift apart.
   late. The tool cannot guarantee a metric reflects real user pain.
 - Pod deletion is not reversible, so for that fault the safety value is the
   unhealthy-baseline refusal and the recovery check, not rollback.
-- Scheduling (the `schedule` field) defines recurrence but cron execution is not
-  wired into the operator loop yet. It is parsed and stored, not fired.
+- Schedules are in UTC only. A run starts up to 30 seconds after its fire time,
+  because the timer ticks every 30 seconds.
 - Safe runs cover `network-latency` and `pod-failure`. `cpu-stress` has no
   reversible action yet, so with a safety block it reports
   `unsupported_for_safe_run` and should be run on the legacy path instead.

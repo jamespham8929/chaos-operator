@@ -1,0 +1,67 @@
+# Lets Prometheus scrape the operator, and alerts when it stops doing its job.
+# Needs prometheus-operator (kube-prometheus-stack installs it).
+apiVersion: v1
+kind: Service
+metadata:
+  name: chaos-operator-metrics
+  namespace: chaos-system
+  labels:
+    app.kubernetes.io/name: chaos-operator
+spec:
+  selector:
+    app.kubernetes.io/name: chaos-operator
+  ports:
+    - name: metrics
+      port: 8000
+      targetPort: metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: chaos-operator
+  namespace: chaos-system
+  labels:
+    app.kubernetes.io/name: chaos-operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chaos-operator
+  endpoints:
+    - port: metrics
+      interval: 30s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: chaos-operator
+  namespace: chaos-system
+  labels:
+    app.kubernetes.io/name: chaos-operator
+spec:
+  groups:
+    - name: chaos-operator
+      rules:
+        - alert: ChaosScheduleMissedRuns
+          # A schedule that keeps missing slots means the operator was down at
+          # fire time or keeps finding slots past their deadline. Either way the
+          # resilience test someone relies on is not happening.
+          expr: increase(chaos_schedule_missed_runs_total[1d]) > 0
+          labels:
+            severity: ticket
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.name }} missed scheduled chaos runs"
+            description: >-
+              The experiment skipped {{ $value | humanize }} scheduled run(s) in
+              the last day. Check that the operator is running and that
+              startingDeadlineSeconds is longer than its restarts take.
+        - alert: ChaosExperimentDidNotRecover
+          # The system under test stayed outside its steady-state band after
+          # the fault was removed. This is a real finding, not an operator bug.
+          expr: increase(chaos_experiment_runs_total{outcome="did_not_recover"}[1h]) > 0
+          labels:
+            severity: page
+          annotations:
+            summary: "A {{ $labels.type }} chaos run left the system out of steady state"
+            description: >-
+              The run finished but the steady-state hypothesis no longer holds.
+              Look at the ChaosExperiment status and the service it targeted.
