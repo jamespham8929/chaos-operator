@@ -5,6 +5,7 @@ metadata:
   namespace: payments
 spec:
   type: network-latency
+  service: checkout-api
   selector:
     matchLabels:
       app: checkout-api

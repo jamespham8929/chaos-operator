@@ -33,6 +33,13 @@ spec:
                       type: object
                       additionalProperties:
                         type: string
+                service:
+                  type: string
+                  description: >-
+                    The service this experiment targets. Each run record in
+                    status carries it, so incident tools can link a run to a
+                    page. Defaults to the app.kubernetes.io/name or app label
+                    in the selector.
                 schedule:
                   type: string
                   description: >-
@@ -148,8 +155,9 @@ spec:
                             default: 3
             status:
               type: object
-              # The operator writes run results and schedule bookkeeping here.
-              # Without this, the API server prunes every field it writes.
+              # The operator writes run results, the run history, and schedule
+              # bookkeeping here. Without this, the API server prunes every
+              # field it writes.
               x-kubernetes-preserve-unknown-fields: true
       subresources:
         status: {}

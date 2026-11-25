@@ -254,3 +254,69 @@ class TestPodWithoutAnnotations:
         pod.metadata.annotations = None
         eligible = operator._list_eligible_pods(core_returning([pod]), "default", {})
         assert [p.metadata.name for p in eligible] == ["bare"]
+
+
+class TestRunHistory:
+    """Each run leaves a record in status.runs for incident tools to read."""
+
+    SPEC = {"type": "pod-failure", "selector": {"matchLabels": {"app": "checkout"}}}
+
+    def _run_once(self, status, trigger_create=True):
+        from datetime import datetime, timezone
+        patch_obj = SimpleNamespace(status={})
+        clock = iter([
+            datetime(2026, 11, 24, 3, 0, 1, tzinfo=timezone.utc),
+            datetime(2026, 11, 24, 3, 2, 0, tzinfo=timezone.utc),
+        ])
+        with patch.object(operator, "_load_k8s_client"), \
+             patch.object(operator, "_utcnow", side_effect=lambda: next(clock)), \
+             patch.object(
+                 operator, "_dispatch_experiment",
+                 return_value={"status": "completed", "pods_deleted": 1},
+             ):
+            operator.handle_experiment(
+                spec=self.SPEC, name="exp", namespace="payments", logger=MagicMock(),
+                status=status, patch=patch_obj,
+            )
+        return patch_obj.status.get("runs")
+
+    def test_a_one_shot_run_is_recorded(self):
+        runs = self._run_once(status={})
+        assert len(runs) == 1
+        assert runs[0]["id"] == "payments/exp/20261124T030001Z"
+        assert runs[0]["service"] == "checkout"
+        assert runs[0]["trigger"] == "create"
+        assert runs[0]["startedAt"] == "2026-11-24T03:00:01Z"
+        assert runs[0]["finishedAt"] == "2026-11-24T03:02:00Z"
+        assert runs[0]["podsAffected"] == 1
+
+    def test_earlier_runs_are_kept(self):
+        runs = self._run_once(status={"runs": [{"id": "older"}]})
+        assert [r["id"] for r in runs] == ["older", "payments/exp/20261124T030001Z"]
+
+    def test_a_scheduled_run_is_recorded(self):
+        spec = {**self.SPEC, "schedule": "0 3 * * *"}
+        patch_obj = SimpleNamespace(status={})
+        from datetime import datetime, timezone
+        now = datetime(2026, 11, 23, 3, 0, tzinfo=timezone.utc)
+        with patch.object(operator, "_load_k8s_client"), \
+             patch.object(
+                 operator, "_dispatch_experiment", return_value={"status": "succeeded"},
+             ):
+            operator.tick(
+                spec, "nightly", "payments", {"creationTimestamp": "2026-11-22T12:00:00Z"},
+                {}, patch_obj, MagicMock(), now=now,
+            )
+        runs = patch_obj.status["runs"]
+        assert len(runs) == 1
+        assert runs[0]["trigger"] == "schedule"
+        assert runs[0]["outcome"] == "succeeded"
+        assert patch_obj.status["schedule"]["lastResult"] == "succeeded"
+
+    def test_a_skipped_protected_namespace_writes_nothing(self):
+        patch_obj = SimpleNamespace(status={})
+        operator.handle_experiment(
+            spec=self.SPEC, name="exp", namespace="kube-system", logger=MagicMock(),
+            patch=patch_obj,
+        )
+        assert "runs" not in patch_obj.status

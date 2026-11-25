@@ -86,6 +86,23 @@ slots. [`k8s/monitoring.yaml`](k8s/monitoring.yaml) adds the ServiceMonitor and
 two alerts. One fires when a schedule keeps missing runs. The other pages when
 a run leaves the system outside its steady state.
 
+### Every run leaves a record
+
+Each run appends a record to `status.runs`. The list keeps the newest 20 runs.
+A record has a stable ID, the target service, start and finish times, the
+outcome, and whether a fault was actually injected. incident-cli reads these
+records, so a page during a game day lists the experiment as a likely cause.
+Set `spec.service` to name the target. Without it, the operator uses the
+`app.kubernetes.io/name` or `app` label from the selector. See
+[ADR 0004](docs/adr/0004-run-history.md).
+
+```console
+$ kubectl get ce checkout-latency-safe -n payments -o jsonpath='{.status.runs[-1:]}'
+{"id":"payments/checkout-latency-safe/20261124T030005Z","service":"checkout-api",
+ "type":"network-latency","outcome":"aborted","injected":true,
+ "startedAt":"2026-11-24T03:00:05Z","finishedAt":"2026-11-24T03:01:20Z",...}
+```
+
 ## Try it without a cluster
 
 The runner, safety controller, and verifier work against any metric probe, so the
@@ -143,8 +160,9 @@ chaos_operator/
   cron.py           five-field cron parser, UTC
   scheduling.py     decides per tick whether a scheduled run is due
   metrics.py        Prometheus counters, histogram, and gauges
+  history.py        the run records kept in status.runs
   experiments/      the fault injectors (pod failure, network latency, cpu stress)
-docs/adr/           steady state, aborting on blast radius, scheduled runs
+docs/adr/           steady state, aborting on blast radius, scheduled runs, run history
 examples/           a runnable local demo and two cluster manifests
 ```
 

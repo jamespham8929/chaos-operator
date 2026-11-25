@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 import kopf
 import kubernetes
 
-from . import metrics
+from . import history, metrics
 from .cron import CronSchedule
 from .experiments.cpu_stress import CPUStressExperiment
 from .experiments.network_chaos import NetworkLatencyExperiment
@@ -87,7 +87,10 @@ def handle_experiment(spec, name, namespace, logger, status=None, **kwargs):
         )
         return None
 
-    return _run(spec, name, namespace, trigger="create", logger=logger)
+    return _run(
+        spec, name, namespace, trigger="create", logger=logger,
+        status=status, patch=kwargs.get("patch"),
+    )
 
 
 def _register_schedule(spec, name, namespace, logger) -> dict:
@@ -148,21 +151,26 @@ def tick(spec, name, namespace, meta, status, patch, logger, now: datetime) -> N
         )
 
     if decision.run:
-        result = _run(spec, name, namespace, trigger="schedule", logger=logger)
+        result = _run(
+            spec, name, namespace, trigger="schedule", logger=logger,
+            status=status, patch=patch,
+        )
         updated["lastRunTime"] = _iso(now)
         updated["lastResult"] = result.get("status")
 
     patch.status["schedule"] = updated
 
 
-def _run(spec, name, namespace, trigger: str, logger) -> dict:
+def _run(spec, name, namespace, trigger: str, logger, status=None, patch=None) -> dict:
     experiment_type = spec.get("type")
     selector = spec.get("selector", {}).get("matchLabels", {})
     logger.info("Running %s experiment %s/%s (%s)", experiment_type, namespace, name, trigger)
 
+    started_at = _utcnow()
     started = time.monotonic()
     core_v1 = _load_k8s_client()
     result = _dispatch_experiment(core_v1, experiment_type, namespace, selector, spec)
+    finished_at = _utcnow()
     metrics.record_run(
         experiment_type,
         result,
@@ -170,8 +178,13 @@ def _run(spec, name, namespace, trigger: str, logger) -> dict:
         trigger=trigger,
         namespace=namespace,
         name=name,
-        finished_at=time.time(),
+        finished_at=finished_at.timestamp(),
     )
+    if patch is not None:
+        record = history.run_record(
+            spec, name, namespace, trigger, started_at, finished_at, result
+        )
+        patch.status["runs"] = history.append((status or {}).get("runs"), record)
     return result
 
 
