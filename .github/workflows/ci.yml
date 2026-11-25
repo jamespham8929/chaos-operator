@@ -41,6 +41,18 @@ jobs:
       - run: pip install ruff==0.16.1
       - run: ruff check chaos_operator/ tests/
 
+  image:
+    name: Build the image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build
+        run: docker build -t chaos-operator:ci .
+      # kopf needs a user name at startup, and the deployment runs as uid
+      # 65532. This fails if that user has no passwd entry in the image.
+      - name: Check the operator user
+        run: docker run --rm --user 65532:65532 --entrypoint python chaos-operator:ci -c "import getpass, chaos_operator.operator; print(getpass.getuser())"
+
   crd:
     name: Validate CRD schema
     runs-on: ubuntu-latest

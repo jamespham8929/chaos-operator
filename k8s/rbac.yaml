@@ -9,6 +9,10 @@ kind: ClusterRole
 metadata:
   name: chaos-operator
 rules:
+  # kopf reads the CRD list at startup to find the resources it serves.
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["chaos.jamespham.io"]
     resources: ["chaosexperiments"]
     verbs: ["get", "list", "watch", "patch", "update"]
@@ -18,9 +22,10 @@ rules:
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list", "watch", "delete"]
+  # Exec over WebSockets is a GET, and newer API servers check both verbs.
   - apiGroups: [""]
     resources: ["pods/exec"]
-    verbs: ["create"]
+    verbs: ["get", "create"]
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["create", "patch"]

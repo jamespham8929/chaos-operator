@@ -30,7 +30,7 @@ spec:
         - name: operator
           image: ghcr.io/jamespham8929/chaos-operator:latest
           imagePullPolicy: IfNotPresent
-          command: ["kopf", "run", "--standalone", "-m", "chaos_operator.operator"]
+          command: ["kopf", "run", "--standalone", "--all-namespaces", "-m", "chaos_operator.operator"]
           env:
             - name: CHAOS_PROMETHEUS_URL
               value: http://prometheus-operated.monitoring:9090
