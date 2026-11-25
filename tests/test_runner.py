@@ -102,3 +102,24 @@ def test_detects_failure_to_recover():
     report = runner.run(experiment, controller, duration_seconds=30)
     assert report.outcome == Outcome.DID_NOT_RECOVER
     assert report.recovery_verdict is not None
+
+
+def test_failed_injection_rolls_back_and_reports_failed():
+    # A fault that breaks halfway, like tc missing on the second pod, must not
+    # stay half injected, and the run must not count as injected.
+    probe = NoisyProbe("availability", mean=0.999, stddev=0.0003, seed=7)
+    runner, controller = build(probe)
+    rolled_back = {"value": False}
+
+    def broken_inject():
+        raise RuntimeError("tc: not found")
+
+    experiment = SyntheticExperiment(
+        "latency", on_inject=broken_inject,
+        on_rollback=lambda: rolled_back.__setitem__("value", True),
+    )
+    report = runner.run(experiment, controller, duration_seconds=30)
+    assert report.outcome == Outcome.FAILED
+    assert rolled_back["value"] is True
+    assert report.polls == 0, "must not monitor a fault that never got in"
+    assert any("tc: not found" in note for note in report.notes)

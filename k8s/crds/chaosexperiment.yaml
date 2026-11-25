@@ -40,6 +40,14 @@ spec:
                     status carries it, so incident tools can link a run to a
                     page. Defaults to the app.kubernetes.io/name or app label
                     in the selector.
+                container:
+                  type: string
+                  description: >-
+                    The container to run network-latency and cpu-stress in.
+                    It must have tc or stress-ng. Use it for a pod with a
+                    sidecar, so the app container can stay minimal. Pods share
+                    one network namespace, so tc in the sidecar slows the
+                    whole pod. Leave it empty for a pod with one container.
                 schedule:
                   type: string
                   description: >-

@@ -6,6 +6,8 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
+from .podexec import exec_in_pod
+
 if TYPE_CHECKING:
     import kubernetes
 
@@ -13,8 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 class NetworkLatencyExperiment:
-    def __init__(self, core_v1: kubernetes.client.CoreV1Api):
+    def __init__(self, core_v1: kubernetes.client.CoreV1Api, container: str | None = None):
         self._core_v1 = core_v1
+        # The container that has tc. None lets the API pick, which only works
+        # for a pod with one container.
+        self._container = container
 
     def run(self, pods: list, config: dict) -> dict:
         latency_ms = config.get("latencyMs", 100)
@@ -44,7 +49,9 @@ class NetworkLatencyExperiment:
             self._cleanup(affected)
 
         return {
-            "status": "completed",
+            # Nothing was injected if every pod failed, and the run record
+            # must not claim otherwise.
+            "status": "completed" if affected else "failed",
             "experiment": "network-latency",
             "latency_ms": latency_ms,
             "jitter_ms": jitter_ms,
@@ -73,14 +80,4 @@ class NetworkLatencyExperiment:
                 logger.warning("Cleanup failed on %s/%s: %s", namespace, pod_name, e)
 
     def _exec(self, namespace: str, pod_name: str, command: list[str]) -> str:
-        from kubernetes import stream
-        return stream.stream(
-            self._core_v1.connect_get_namespaced_pod_exec,
-            pod_name,
-            namespace,
-            command=command,
-            stderr=True,
-            stdin=False,
-            stdout=True,
-            tty=False,
-        )
+        return exec_in_pod(self._core_v1, namespace, pod_name, command, self._container)

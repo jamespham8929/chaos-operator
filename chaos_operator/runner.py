@@ -42,6 +42,8 @@ class Outcome(str, Enum):
     DID_NOT_RECOVER = "did_not_recover"
     # Refused to start because the pre-check did not show a healthy baseline.
     REFUSED = "refused"
+    # The fault could not be injected. Whatever did get in was rolled back.
+    FAILED = "failed"
 
 
 @dataclass
@@ -103,9 +105,16 @@ class ChaosRunner:
             )
             return report
 
-        # 2. Inject.
+        # 2. Inject. If injection fails partway, roll back what got in, so a
+        # half-injected fault never stays behind.
         controller.reset()
-        experiment.inject()
+        try:
+            experiment.inject()
+        except Exception as e:
+            experiment.rollback()
+            report.outcome = Outcome.FAILED
+            report.notes.append(f"injection failed and was rolled back: {e}")
+            return report
         report.notes.append(f"injected fault: {experiment.name}")
 
         # 3. Monitor.

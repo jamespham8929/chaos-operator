@@ -95,6 +95,19 @@ class TestDispatch:
         exp_cls.return_value.run.assert_called_once()
         assert result == {"status": "completed"}
 
+    @pytest.mark.parametrize(
+        "experiment_type,class_name",
+        [("network-latency", "NetworkLatencyExperiment"), ("cpu-stress", "CPUStressExperiment")],
+    )
+    def test_exec_faults_get_the_container(self, experiment_type, class_name):
+        core_v1 = core_returning([make_pod()])
+        with patch.object(operator, class_name) as exp_cls:
+            exp_cls.return_value.run.return_value = {"status": "completed"}
+            operator._dispatch_experiment(
+                core_v1, experiment_type, "default", {"app": "web"}, {"container": "chaos-agent"}
+            )
+        assert exp_cls.call_args.kwargs["container"] == "chaos-agent"
+
     def test_unknown_type_raises_permanent_error(self):
         core_v1 = core_returning([make_pod()])
 

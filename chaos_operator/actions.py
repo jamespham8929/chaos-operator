@@ -24,9 +24,11 @@ logger = logging.getLogger(__name__)
 
 
 class NetworkLatencyAction:
-    def __init__(self, core_v1, pods: list, latency_ms: int, jitter_ms: int):
+    def __init__(
+        self, core_v1, pods: list, latency_ms: int, jitter_ms: int, container: str | None = None
+    ):
         self.name = "network-latency"
-        self._exp = NetworkLatencyExperiment(core_v1)
+        self._exp = NetworkLatencyExperiment(core_v1, container=container)
         self._pods = pods
         self._latency_ms = latency_ms
         self._jitter_ms = jitter_ms

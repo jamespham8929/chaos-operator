@@ -214,12 +214,12 @@ def _dispatch_experiment(
 
     if experiment_type == "network-latency":
         cfg = spec.get("networkLatency", {})
-        exp = NetworkLatencyExperiment(core_v1)
+        exp = NetworkLatencyExperiment(core_v1, container=spec.get("container"))
         return exp.run(pods, cfg)
 
     if experiment_type == "cpu-stress":
         cfg = spec.get("cpuStress", {})
-        exp = CPUStressExperiment(core_v1)
+        exp = CPUStressExperiment(core_v1, container=spec.get("container"))
         return exp.run(pods, cfg)
 
     raise kopf.PermanentError(f"Unknown experiment type: {experiment_type}")

@@ -96,6 +96,13 @@ Set `spec.service` to name the target. Without it, the operator uses the
 `app.kubernetes.io/name` or `app` label from the selector. See
 [ADR 0004](docs/adr/0004-run-history.md).
 
+A record only says `injected: true` when a fault really ran. The latency and
+CPU faults run `tc` or `stress-ng` in the pod, and the operator checks the
+exit status of each command. If the command fails on every pod, the run is
+`failed` and `injected: false`. Before this check, a missing `tc` still
+produced a record that claimed the fault was in. incident-cli treats these
+records as an answer key, so that mattered.
+
 ```console
 $ kubectl get ce checkout-latency-safe -n payments -o jsonpath='{.status.runs[-1:]}'
 {"id":"payments/checkout-latency-safe/20261124T030005Z","service":"checkout-api",
@@ -129,6 +136,15 @@ recovery verdict:  violated
 
 ## Running on a cluster
 
+Build the image first. On kind, load it into the cluster.
+
+```bash
+docker build -t chaos-operator .
+kind load docker-image chaos-operator
+```
+
+Then point `k8s/operator-deployment.yaml` at that image and apply the rest.
+
 ```bash
 kubectl apply -f k8s/crds/chaosexperiment.yaml
 kubectl apply -f k8s/rbac.yaml
@@ -146,6 +162,13 @@ An experiment with no `steadyStateHypothesis` and `safety` block falls back to
 the legacy fire-and-forget dispatch, so the safety machinery is opt-in per
 experiment.
 
+`network-latency` and `cpu-stress` need `tc` or `stress-ng` inside the pod.
+Many app images are distroless and have neither. Add a sidecar that has them
+and name it in `spec.container`. Pods share one network namespace, so `tc` in
+the sidecar slows the whole pod. The sidecar needs `NET_ADMIN` and must run as
+root, because Linux does not give an added capability to a non-root process.
+platform-mcp's incident gym runs every fault this way.
+
 ## Layout
 
 ```
@@ -162,6 +185,7 @@ chaos_operator/
   metrics.py        Prometheus counters, histogram, and gauges
   history.py        the run records kept in status.runs
   experiments/      the fault injectors (pod failure, network latency, cpu stress)
+                    and the exec helper that checks each command's exit status
 docs/adr/           steady state, aborting on blast radius, scheduled runs, run history
 examples/           a runnable local demo and two cluster manifests
 ```
@@ -173,9 +197,9 @@ pip install -e ".[dev]"
 pytest tests/ -v --cov=chaos_operator
 ```
 
-The runner tests in [`tests/test_runner.py`](tests/test_runner.py) cover the four
-outcomes (succeeded, aborted, refused, did-not-recover) end to end with a fake
-clock, so they run instantly and deterministically.
+The runner tests in [`tests/test_runner.py`](tests/test_runner.py) cover the five
+outcomes (succeeded, aborted, refused, did-not-recover, failed) end to end with
+a fake clock, so they run instantly and deterministically.
 
 The scheduling tests pass the clock in, so outage and late-start cases run
 without waiting for real time.

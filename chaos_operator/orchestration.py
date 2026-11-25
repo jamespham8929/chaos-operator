@@ -60,6 +60,7 @@ def build_action(core_v1, experiment_type: str, pods: list, spec: dict):
             core_v1, pods,
             latency_ms=cfg.get("latencyMs", 100),
             jitter_ms=cfg.get("jitterMs", 10),
+            container=spec.get("container"),
         )
     if experiment_type == "pod-failure":
         cfg = spec.get("podFailure", {})

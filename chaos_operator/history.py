@@ -17,9 +17,12 @@ from .metrics import pods_affected
 # that the object stays far below the etcd size limit.
 HISTORY_LIMIT = 20
 
-# Outcomes where the operator stopped before it touched any pod. A run like
-# this cannot be the cause of an incident, and readers can skip it.
-NOT_INJECTED = frozenset({"no_targets", "skipped", "refused", "unsupported_for_safe_run"})
+# Outcomes where no fault reached any pod. Either the operator stopped first,
+# or the injection failed on every pod. A run like this cannot be the cause of
+# an incident, and readers can skip it.
+NOT_INJECTED = frozenset(
+    {"no_targets", "skipped", "refused", "unsupported_for_safe_run", "failed"}
+)
 
 # Labels that usually name the service a pod belongs to, most specific first.
 SERVICE_LABELS = ("app.kubernetes.io/name", "app")
